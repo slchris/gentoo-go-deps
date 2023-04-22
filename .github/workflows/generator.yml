@@ -55,8 +55,10 @@ jobs:
           mkdir -p $TMP/go-mod
           export GOMODCACHE="${TMP}/go-mod"
           find . -name go.mod -execdir go mod download -modcacherw \;
-          tar --create --auto-compress --file /tmp/${P}-deps.tar.xz ${GOMODCACHE}
+          cd $TMP
+          tar --create --auto-compress --file /tmp/${P}-deps.tar.xz go-mod
           rm -rf ${GOMODCACHE}
+          cd -
           go mod vendor
           tar --create --auto-compress --file /tmp/${P}-vendor.tar.xz vendor
 
