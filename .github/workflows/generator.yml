@@ -53,7 +53,7 @@ jobs:
           cd input
           mkdir -pv go-mod
           export GOMODCACHE="${PWD}/go-mod"
-          find . -name go.mod -execdir go mod download -modcacherw \;
+          find . -path ${GOMODCACHE} -prune -o -name go.mod -execdir go mod download -modcacherw \;
           tar --create --auto-compress --file /tmp/${P}-deps.tar.xz ${GOMODCACHE}
           rm -rf ${GOMODCACHE}
           go mod vendor
