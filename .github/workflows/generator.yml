@@ -51,9 +51,11 @@ jobs:
           P: ${{ inputs.P }}
         run: |
           cd input
-          GOMODCACHE="${PWD}"/go-mod go mod download -modcacherw
-          tar --create --auto-compress --file /tmp/${P}-deps.tar.xz go-mod
-          rm -rf go-mod
+          mkdir -pv go-mod
+          export GOMODCACHE="${PWD}/go-mod"
+          find . -name go.mod -execdir go mod download -modcacherw \;
+          tar --create --auto-compress --file /tmp/${P}-deps.tar.xz ${GOMODCACHE}
+          rm -rf ${GOMODCACHE}
           go mod vendor
           tar --create --auto-compress --file /tmp/${P}-vendor.tar.xz vendor
 
