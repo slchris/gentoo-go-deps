@@ -6,7 +6,15 @@ on:
       # net-proxy/clash-meta/clash-meta-1.14.1.ebuild
       # release artiface: ${PN}-${PV}-deps.tar.xz: clash-meta-1.14.1-deps.tar.xz
       # release tag: ${P}=${PN}-${PV}: clash-meta-1.14.1
-      
+
+      LANG:
+        type: choice
+        description: "generate golang(go-mod/vendor) or javascript(node_modules) deps"
+        options:
+        - golang
+        - javascript
+        - javascript(pnpm)
+
       REPO:
         description: "github repo name: MetaCubeX/Clash.Meta"
         required: true
@@ -19,48 +27,86 @@ on:
         description: "P in ebuild: clash-meta-1.14.1"
         required: true
 
+      WORKDIR:
+        description: "(optional)source directory to perform scripts, default to empty string"
+        default: ''
+
 jobs:
   Generator:
     permissions: write-all # required by push tag
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
       - name: Checkout input repo
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           repository: ${{ inputs.REPO }}
           ref: ${{ inputs.TAG }}
           fetch-depth: 0
           path: "input"
 
-      - name: create tag
+      - name: delete old tag
         env:
           P: ${{ inputs.P }}
+          LANG: ${{ inputs.LANG }}
         run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
           git tag --delete ${P} || echo yes
-          git tag ${P} -m "${P}-deps.tar.xz ${P}-vendor.tar.xz"
 
-      - name: Generate deps.tar.xz
+      - name: update go version
+        if: inputs.LANG == 'golang'
+        uses: actions/setup-go@v5
+        with:
+          go-version: 'stable'
+
+      - name: Generate golang deps
+        if: inputs.LANG == 'golang'
         env:
           P: ${{ inputs.P }}
+          WORKDIR: ${{ inputs.WORKDIR }}
         run: |
-          cd input
-          TMP="$(mktemp -d)"
-          mkdir -p $TMP/go-mod
-          export GOMODCACHE="${TMP}/go-mod"
-          find . -name go.mod -execdir go mod download -modcacherw \;
-          cd $TMP
+          git tag ${P} -m "${P}-deps.tar.xz ${P}-vendor.tar.xz"
+          cd "input/${WORKDIR}"
+          GOMODCACHE="${PWD}"/go-mod go mod download -modcacherw
           tar --create --auto-compress --file /tmp/${P}-deps.tar.xz go-mod
-          rm -rf ${GOMODCACHE}
-          cd -
+          rm -rf go-mod
           go mod vendor
           tar --create --auto-compress --file /tmp/${P}-vendor.tar.xz vendor
+
+      - name: Generate javascript node_modules
+        if: inputs.LANG == 'javascript'
+        env:
+          P: ${{ inputs.P }}
+          WORKDIR: ${{ inputs.WORKDIR }}
+        run: |
+          git tag ${P} -m "${P}-node_modules.tar.xz"
+          cd "input/${WORKDIR}"
+          npm install --legacy-peer-deps --cache "${PWD}"/npm-cache
+          tar --create --auto-compress --file /tmp/${P}-node_modules.tar.xz node_modules
+          rm -rf node_modules
+
+      - name: Setup pnpm
+        if: inputs.LANG == 'javascript(pnpm)'
+        uses: pnpm/action-setup@v4
+        with:
+          version: latest
+
+      - name: Generate javascript(pnpm) node_modules
+        if: inputs.LANG == 'javascript(pnpm)'
+        env:
+          P: ${{ inputs.P }}
+          WORKDIR: ${{ inputs.WORKDIR }}
+        run: |
+          git tag ${P} -m "${P}-node_modules-pnpm.tar.xz"
+          cd "input/${WORKDIR}"
+          pnpm install
+          tar --create --auto-compress --file /tmp/${P}-node_modules-pnpm.tar.xz node_modules
+          rm -rf node_modules
 
       - name: push tag
         uses: ad-m/github-push-action@master
@@ -69,11 +115,27 @@ jobs:
           force: true
           tags: true
 
-      - name: Release
-        uses: softprops/action-gh-release@v1
+      - name: upload goland deps to release artifaces
+        if: inputs.LANG == 'golang'
+        uses: softprops/action-gh-release@v2
         with:
           files: |
             /tmp/${{ inputs.P }}-deps.tar.xz
             /tmp/${{ inputs.P }}-vendor.tar.xz
           tag_name: ${{ inputs.P }}
 
+      - name: upload javascript deps to release artifaces
+        if: inputs.LANG == 'javascript'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            /tmp/${{ inputs.P }}-node_modules.tar.xz
+          tag_name: ${{ inputs.P }}
+
+      - name: upload javascript(pnpm) deps to release artifaces
+        if: inputs.LANG == 'javascript(pnpm)'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            /tmp/${{ inputs.P }}-node_modules-pnpm.tar.xz
+          tag_name: ${{ inputs.P }}
