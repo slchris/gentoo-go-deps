@@ -75,7 +75,7 @@ jobs:
           GOMODCACHE="${PWD}"/go-mod go mod download -modcacherw
           tar --create --auto-compress --file /tmp/${P}-deps.tar.xz go-mod
           rm -rf go-mod
-          go mod vendor
+          go work vendor
           tar --create --auto-compress --file /tmp/${P}-vendor.tar.xz vendor
 
       - name: Generate javascript node_modules
