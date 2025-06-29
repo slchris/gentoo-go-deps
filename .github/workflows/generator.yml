@@ -75,38 +75,8 @@ jobs:
           GOMODCACHE="${PWD}"/go-mod go mod download -modcacherw
           tar --create --auto-compress --file /tmp/${P}-deps.tar.xz go-mod
           rm -rf go-mod
-          go work vendor
+          go mod vendor
           tar --create --auto-compress --file /tmp/${P}-vendor.tar.xz vendor
-
-      - name: Generate javascript node_modules
-        if: inputs.LANG == 'javascript'
-        env:
-          P: ${{ inputs.P }}
-          WORKDIR: ${{ inputs.WORKDIR }}
-        run: |
-          git tag ${P} -m "${P}-node_modules.tar.xz"
-          cd "input/${WORKDIR}"
-          npm install --legacy-peer-deps --cache "${PWD}"/npm-cache
-          tar --create --auto-compress --file /tmp/${P}-node_modules.tar.xz node_modules
-          rm -rf node_modules
-
-      - name: Setup pnpm
-        if: inputs.LANG == 'javascript(pnpm)'
-        uses: pnpm/action-setup@v4
-        with:
-          version: latest
-
-      - name: Generate javascript(pnpm) node_modules
-        if: inputs.LANG == 'javascript(pnpm)'
-        env:
-          P: ${{ inputs.P }}
-          WORKDIR: ${{ inputs.WORKDIR }}
-        run: |
-          git tag ${P} -m "${P}-node_modules-pnpm.tar.xz"
-          cd "input/${WORKDIR}"
-          pnpm install
-          tar --create --auto-compress --file /tmp/${P}-node_modules-pnpm.tar.xz node_modules
-          rm -rf node_modules
 
       - name: push tag
         uses: ad-m/github-push-action@master
@@ -122,20 +92,4 @@ jobs:
           files: |
             /tmp/${{ inputs.P }}-deps.tar.xz
             /tmp/${{ inputs.P }}-vendor.tar.xz
-          tag_name: ${{ inputs.P }}
-
-      - name: upload javascript deps to release artifaces
-        if: inputs.LANG == 'javascript'
-        uses: softprops/action-gh-release@v2
-        with:
-          files: |
-            /tmp/${{ inputs.P }}-node_modules.tar.xz
-          tag_name: ${{ inputs.P }}
-
-      - name: upload javascript(pnpm) deps to release artifaces
-        if: inputs.LANG == 'javascript(pnpm)'
-        uses: softprops/action-gh-release@v2
-        with:
-          files: |
-            /tmp/${{ inputs.P }}-node_modules-pnpm.tar.xz
           tag_name: ${{ inputs.P }}
